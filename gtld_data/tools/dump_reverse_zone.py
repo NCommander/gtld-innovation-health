@@ -28,30 +28,29 @@ import gtld_data
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('zonefile', help='Zonefile to load')
+    parser.add_argument('outfile', help='Output file')
     parser.add_argument('--origin', help="Origin of the zone file")
     parser.add_argument('--parking-nameservers', help='Parking nameservers', default='data/parking_nameservers.txt')
 
     args = parser.parse_args()
 
-    print("Creating database ...")
-    gtld_data.gtld_db.create_database()
-
     print("Loading zone data, this may take a moment")
     zone_data = gtld_data.ZoneData.load_from_file(args.zonefile, origin=args.origin)
 
-
     zone_processor = gtld_data.ZoneProcessor(zone_data)
-    zone_processor.load_parked_domains_list(args.parking_nameservers)
-    zone_processor.process_zone_data()
+    reverse_zones = zone_processor.get_reverse_zone_information(zone_data.domains)
 
     print("Unique domains: " + str(len(zone_data.domains)))
-    print("Loaded " + str(len(zone_processor.known_parked_nameservers)) + " Known Parked Domains")
-    print("Loaded " + str(len(zone_processor.known_blocked_nameservers)) + " Known Blocked Domains")
-    print()
-    print("Domain Report:")
-    print("  PARKED:  " + str(len(zone_processor.parked_domains)))
-    print("  BLOCKED: " + str(len(zone_processor.blocked_domains)))
-    print("  UNKNOWN: " + str(len(zone_processor.unknown_status_domains)))
+
+    with open(args.outfile, 'w') as f:
+        for domain, rlookup in reverse_zones.items():
+            # Skip blanks
+            if len(rlookup) == 0:
+                continue
+            f.write(domain)
+            for ptr in rlookup:
+                f.write("," + ptr)
+            f.write("\n")
 
 if __name__ == "__main__":
     main()

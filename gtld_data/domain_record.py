@@ -66,11 +66,15 @@ class DomainRecord(object):
                 return records
 
         # Go get the records
-        resolver = dns.resolver.Resolver(configure=False)
-        resolver.nameservers = gtld_lookup_config.upstream_resolvers
-        answers = resolver.query(self.domain_name, record_type)
-
         self.records[record_type] = set()
+
+        try:
+            resolver = dns.resolver.Resolver(configure=False)
+            resolver.nameservers = gtld_lookup_config.upstream_resolvers
+            answers = resolver.query(self.domain_name, record_type)
+        except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.resolver.NoNameservers):
+            # Record doesn't exist, return an empty set
+            return self.records[record_type]
 
         for rdata in answers:
             self.records[record_type].add(rdata.to_text())
@@ -85,6 +89,7 @@ class DomainRecord(object):
             if len(self.reverse_lookup_ptrs) != 0:
                 return self.reverse_lookup_ptrs
 
+        # A/AAAA records may not exist
         a_records = self.get_records(dns.rdatatype.A)
         aaaa_records = self.get_records(dns.rdatatype.AAAA)
 

@@ -79,3 +79,14 @@ class ZoneProcessor(object):
 
         self.unknown_status_domains = domains
         return
+
+    def get_reverse_zone_information(self, domains):
+        '''Returns all reverse zone information for a given domain'''
+        reverse_zones = {}
+        for domain in domains.values():
+            try:
+                reverse_zones[domain.domain_name] = domain.reverse_lookup()
+            except dns.resolver.NoAnswer:
+                continue
+
+        return reverse_zones

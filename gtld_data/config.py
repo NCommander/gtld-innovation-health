@@ -25,5 +25,8 @@ from gtld_data import DomainStatus
 class Config(object):
     def __init__(self):
         self.upstream_resolvers = ["127.0.0.1"]
+        self.database_path = 'db/default.fdb'
+        self.database_username = 'SYSDBA'
+        self.database_password = ''
 
 gtld_lookup_config = Config()
