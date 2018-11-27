@@ -63,10 +63,19 @@ class ZoneProcessor(object):
             return False
 
         # Let's walk the domain list, and see what we need to still process
-        for domain in self.zone_data.domains.values():
+        domains = copy.deepcopy(self.zone_data.domains)
+        for domain in domains.values():
             for nameserver in domain.nameservers:
                 if check_nameserver_against_list(self.known_parked_nameservers, nameserver) is True:
                     self.parked_domains.add(domain)
                     break
-            
+        
+        # Remove the domains we don't need process further
+        for domain in self.parked_domains:
+            del domains[domain.domain_name]
+
+        for domain in self.blocked_domains:
+            del domains[domain.domain_name]
+
+        self.unknown_status_domains = domains
         return

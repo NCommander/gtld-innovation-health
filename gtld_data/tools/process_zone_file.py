@@ -34,8 +34,7 @@ def main():
     args = parser.parse_args()
 
     print("Loading zone data, this may take a moment")
-    zone_data = gtld_data.ZoneData.load_from_file(args.zonefile, args.origin)
-    
+    zone_data = gtld_data.ZoneData.load_from_file(args.zonefile, origin=args.origin)
 
     zone_processor = gtld_data.ZoneProcessor(zone_data)
     zone_processor.load_parked_domains_list(args.parking_nameservers)
@@ -48,6 +47,7 @@ def main():
     print("Domain Report:")
     print("  PARKED:  " + str(len(zone_processor.parked_domains)))
     print("  BLOCKED: " + str(len(zone_processor.blocked_domains)))
+    print("  UNKNOWN: " + str(len(zone_processor.unknown_status_domains)))
 
 if __name__ == "__main__":
     main()

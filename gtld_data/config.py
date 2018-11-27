@@ -18,9 +18,12 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-from gtld_data.domain_status import DomainStatus
-from gtld_data.zone_data import ZoneData
-from gtld_data.zone_processor import ZoneProcessor
-from gtld_data.config import Config, gtld_lookup_config
+'''Holds configuration information'''
 
+from gtld_data import DomainStatus
 
+class Config(object):
+    def __init__(self):
+        self.upstream_resolvers = ["127.0.0.1"]
+
+gtld_lookup_config = Config()

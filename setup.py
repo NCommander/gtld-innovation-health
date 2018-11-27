@@ -160,4 +160,5 @@ setup(
             'dump_nameservers=gtld_data.tools.dump_nameservers:main',
         ],
     },
+    test_suite='tests'
 )
