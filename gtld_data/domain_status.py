@@ -18,6 +18,15 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
+'''Status of what a domain can be'''
 
-def main():
-    print("Hello World")
+from enum import Enum
+
+class DomainStatus(Enum):
+    UNKNOWN = "UNKNOWN"
+    PARKED = "PARKED"
+    BLOCKED = "BLOCKED"
+    CNAME = "CNAME"
+    CNAME_TO_OTHER_TLD = "CNAME_TO_OTHER_TLD"
+    NXDOMAIN = "NXDOMAIN"
+    ACTIVE = "ACTIVE"

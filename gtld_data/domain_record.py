@@ -18,6 +18,15 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-from gtld_data.domain_status import DomainStatus
-from gtld_data.zone_data import ZoneData
-from gtld_data.zone_processor import ZoneProcessor
+'''Holds the record of a domain'''
+
+from gtld_data import DomainStatus
+
+class DomainRecord(object):
+    def __hash__(self):
+        return hash(self.domain_name)
+
+    def __init__(self, name):
+        self.domain_name = name
+        self.nameservers = set()
+        self.status = DomainStatus.UNKNOWN

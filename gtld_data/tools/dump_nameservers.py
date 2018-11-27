@@ -18,6 +18,34 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-from gtld_data.domain_status import DomainStatus
-from gtld_data.zone_data import ZoneData
-from gtld_data.zone_processor import ZoneProcessor
+'''Dumps all the nameservers seen in a given zone with their quantity'''
+
+import argparse
+import operator
+
+import gtld_data
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('zonefile', help='Zonefile to load')
+    parser.add_argument('outfile', help="Output File (in CSV)")
+    parser.add_argument('--origin', help="Origin of the zone file")
+
+    args = parser.parse_args()
+
+    print("Loading zone data, this may take a moment")
+    zd = gtld_data.ZoneData.load_from_file(args.zonefile, args.origin)
+
+    print("Processing zone into useful data")
+
+    print("Unique domains: " + str(len(zd.domains)))
+
+    sorted_d = sorted(zd.known_nameservers.items(), key=lambda k_v: k_v[1]['count'], reverse=True)
+    with open(args.outfile, 'w') as f:
+        for domain in sorted_d:
+            f.write(domain[0] + "," + str(domain[1]['count']) + "\n")
+        f.write("\n")
+
+        
+if __name__ == "__main__":
+    main()
