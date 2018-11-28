@@ -23,6 +23,7 @@
 import copy
 import re
 
+import dns.resolver
 from gtld_data.domain_status import DomainStatus
 
 class ZoneProcessor(object):
@@ -66,7 +67,7 @@ class ZoneProcessor(object):
         domains = copy.deepcopy(self.zone_data.domains)
         for domain in domains.values():
             for nameserver in domain.nameservers:
-                if check_nameserver_against_list(self.known_parked_nameservers, nameserver) is True:
+                if check_nameserver_against_list(self.known_parked_nameservers, nameserver.nameserver) is True:
                     self.parked_domains.add(domain)
                     break
         

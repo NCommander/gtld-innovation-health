@@ -18,39 +18,35 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-'''Dumps all the nameservers seen in a given zone with their quantity'''
+'''Holds the record of a domain'''
 
-import argparse
-import operator
+from gtld_data.config import gtld_lookup_config
+from gtld_data.domain_status import DomainStatus
+from gtld_data.db import gtld_db
 
-import gtld_data
+import dns.resolver
+import dns.rdatatype
+import dns.reversename
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('zonefile', help='Zonefile to load')
-    parser.add_argument('outfile', help="Output File (in CSV)")
-    parser.add_argument('--origin', help="Origin of the zone file")
+class NameserverRecord(object):
+    def __hash__(self):
+        return hash(self.nameserver)
 
-    args = parser.parse_args()
+    def __eq__(self, other):
+        return self.nameserver == other.nameserver
 
-    print("Loading zone data, this may take a moment")
-    zd = gtld_data.ZoneData.load_from_file(args.zonefile, args.origin)
+    def __init__(self, name):
+        self._zonefile_id = None
+        self.db_id = None
+        self.nameserver = name
+        self.count = 0
+    
+    def increment_count(self):
+        self.count = self.count+1
 
-    print("Processing zone into useful data")
-
-    print("Unique domains: " + str(len(zd.domains)))
-
-    # Create a temp dict for dumping the nameservers
-    nameservers_dict = {}
-    for nameserver in zd.known_nameservers:
-        nameservers_dict[nameserver.nameserver] = nameserver.count
-
-    sorted_d = sorted(nameservers_dict.items(), key=lambda kv: kv[1], reverse=True)
-    with open(args.outfile, 'w') as f:
-        for domain in sorted_d:
-            f.write(domain[0] + "," + str(domain[1]) + "\n")
-        f.write("\n")
-
-        
-if __name__ == "__main__":
-    main()
+    def to_db(self, cursor=None):
+        '''Stores nameserver in the database'''
+        # Load the list of nameservers and append a database id to the dict
+        nameserver_insert = """INSERT INTO nameservers (zone_file, nameserver, domain_count) VALUES (?, ?, ?) RETURNING id"""
+        cursor.execute(nameserver_insert, (self._zonefile_id, self.nameserver, self.count))
+        self.db_id = int(cursor.fetchone()[0])

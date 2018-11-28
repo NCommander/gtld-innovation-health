@@ -23,6 +23,8 @@ import dns.rdatatype
 
 from gtld_data.domain_status import DomainStatus
 from gtld_data.domain_record import DomainRecord
+from gtld_data.nameserver import NameserverRecord
+
 from gtld_data.db import gtld_db
 
 class ZoneData(object):
@@ -43,36 +45,14 @@ class ZoneData(object):
         zd.process_loaded_zone()
         return zd
 
-    def to_db(self):
+    def to_db(self, cursor):
         '''Stores zone data in the database'''
 
         # Create zone file entry and our PK entry
         print("Writing to database ...")
         zone_file_insert = """INSERT INTO zone_files (origin, soa) VALUES (?, ?) RETURNING id"""
-        cursor = gtld_db.database_connection.cursor()
-        gtld_db.database_connection.begin()
         cursor.execute(zone_file_insert, (self.origin, self.soa))
         self.db_id = int(cursor.fetchone()[0])
-
-        # Load the list of nameservers and append a database id to the dict
-        nameserver_insert = """INSERT INTO nameservers (zone_file, nameserver, domain_count) VALUES (?, ?, ?) RETURNING id"""
-        for key, value in self.known_nameservers.items():
-            cursor.execute(nameserver_insert, (self.db_id, key, value['count']))
-            value['db_id'] = int(cursor.fetchone()[0])
-
-        # Load our list of domains, then link it to the nameserver
-        domain_insert = """INSERT INTO domains (zone_file, domain_name, status) VALUES (?, ?, ?) RETURNING id"""
-        domain_nameservers = """INSERT INTO domain_nameservers(domain_id, nameserver_id) VALUES (?, ?)"""
-        for _, value in self.domains.items():
-            # First the domain
-            cursor.execute(domain_insert, (self.db_id, value.domain_name, "UNKNOWN"))
-            value.db_id = int(cursor.fetchone()[0])
-
-            # Now the link table
-            for nameserver in value.nameservers:
-                nameserver_record = self.known_nameservers.get(nameserver)
-                cursor.execute(domain_nameservers, (value.db_id, nameserver_record['db_id']))
-        gtld_db.database_connection.commit()
 
     def process_loaded_zone(self):
         '''Processes parsed zone data'''
@@ -80,25 +60,45 @@ class ZoneData(object):
         soa_record = list(self.parsed_zone.iterate_rdatas(dns.rdatatype.SOA))[0]
         self.soa = int(soa_record[2].serial)
         records = list(self.parsed_zone.iterate_rdatas(dns.rdatatype.NS))
+
+        # Write the zonefile record to the database
+        cursor = gtld_db.database_connection.cursor()
+        gtld_db.database_connection.begin()
+        self.to_db(cursor)
+
+        # We loop twice to handle adding the nameservers in a single go
+        for rr in records:
+            # See if we've seen this nameserver, and increment its count
+            nameserver_txt = rr[2].to_text()
+            nameserver_obj = self.known_nameservers.get(nameserver_txt, None)
+            if nameserver_obj is None:
+                nameserver_obj = NameserverRecord(nameserver_txt)
+                self.known_nameservers[nameserver_txt] = nameserver_obj
+            self.known_nameservers[nameserver_txt].increment_count()
+
+        # Add all nameservers to the database
+        for _, nameserver in self.known_nameservers.items():
+            nameserver._zonefile_id = self.db_id
+            nameserver.to_db(cursor)
+
+        # Now process the domains
         for rr in records:
             full_domain_name = rr[0].to_text() + "." + self.origin
+            nameserver_txt = rr[2].to_text()
 
             # First document the domains
             domain = self.domains.get(full_domain_name, None)
             if domain is None:
                 self.domains[full_domain_name] = DomainRecord(full_domain_name)
+                domain = self.domains[full_domain_name]
 
-            ns_text = rr[2].to_text()
-            self.domains[full_domain_name].nameservers.add(ns_text)
-        
-            # Then see if we've seen this nameserver, and increment its count
-            nameserver = self.known_nameservers.get(ns_text, None)
-            if nameserver is None:
-                self.known_nameservers[ns_text] = {}
-                self.known_nameservers[ns_text]['count'] = 0
+            # This is ugly, but we need the nameserver record from above.
+            nameserver_obj = self.known_nameservers[nameserver_txt]
+            domain.nameservers.add(nameserver_obj)
 
-            self.known_nameservers[ns_text]['count'] = \
-                self.known_nameservers[ns_text]['count'] + 1
+        # Write our list of domains to the database
+        for _, value in self.domains.items():
+            value._zonefile_id = self.db_id
+            value.to_db(cursor)
 
-        # Write it out to the database
-        self.to_db()
+        gtld_db.database_connection.commit()

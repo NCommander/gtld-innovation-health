@@ -32,12 +32,26 @@ class DomainRecord(object):
         return hash(self.domain_name)
 
     def __init__(self, name):
+        self._zonefile_id = None
         self.db_id = None
         self.domain_name = name
         self.nameservers = set()
         self.status = DomainStatus.UNKNOWN
         self.records = {}
         self.reverse_lookup_ptrs = set()
+
+    def to_db(self, cursor):
+        '''Stores domain record in the database'''
+        domain_insert = """INSERT INTO domains (zone_file, domain_name, status) VALUES (?, ?, ?) RETURNING id"""
+        domain_nameservers = """INSERT INTO domain_nameservers(domain_id, nameserver_id) VALUES (?, ?)"""
+
+        # Save the domain record
+        cursor.execute(domain_insert, (self._zonefile_id, self.domain_name, self.status))
+        self.db_id = int(cursor.fetchone()[0])
+
+        # And link nameserver records
+        for nameserver in self.nameservers:
+            cursor.execute(domain_nameservers, (self.db_id, nameserver.db_id))
 
     def lookup_nameservers(self):
         '''Looks up the nameservers for a given domain
