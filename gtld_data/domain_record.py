@@ -32,6 +32,7 @@ class DomainRecord(object):
         return hash(self.domain_name)
 
     def __init__(self, name):
+        self.db_id = None
         self.domain_name = name
         self.nameservers = set()
         self.status = DomainStatus.UNKNOWN

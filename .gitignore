@@ -117,3 +117,5 @@ dmypy.json
 # My env
 env
 .vscode
+db
+zonefiles

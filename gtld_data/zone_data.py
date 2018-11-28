@@ -23,11 +23,14 @@ import dns.rdatatype
 
 from gtld_data.domain_status import DomainStatus
 from gtld_data.domain_record import DomainRecord
+from gtld_data.db import gtld_db
 
 class ZoneData(object):
     '''Holds reference data for the zone and useful modules for it'''
     def __init__(self, origin=None):
+        self.db_id = None
         self.origin = None
+        self.soa = None
         self.parsed_zone = None
         self.domains = {}
         self.known_nameservers = {}
@@ -40,8 +43,42 @@ class ZoneData(object):
         zd.process_loaded_zone()
         return zd
 
+    def to_db(self):
+        '''Stores zone data in the database'''
+
+        # Create zone file entry and our PK entry
+        print("Writing to database ...")
+        zone_file_insert = """INSERT INTO zone_files (origin, soa) VALUES (?, ?) RETURNING id"""
+        cursor = gtld_db.database_connection.cursor()
+        gtld_db.database_connection.begin()
+        cursor.execute(zone_file_insert, (self.origin, self.soa))
+        self.db_id = int(cursor.fetchone()[0])
+
+        # Load the list of nameservers and append a database id to the dict
+        nameserver_insert = """INSERT INTO nameservers (zone_file, nameserver, domain_count) VALUES (?, ?, ?) RETURNING id"""
+        for key, value in self.known_nameservers.items():
+            cursor.execute(nameserver_insert, (self.db_id, key, value['count']))
+            value['db_id'] = int(cursor.fetchone()[0])
+
+        # Load our list of domains, then link it to the nameserver
+        domain_insert = """INSERT INTO domains (zone_file, domain_name, status) VALUES (?, ?, ?) RETURNING id"""
+        domain_nameservers = """INSERT INTO domain_nameservers(domain_id, nameserver_id) VALUES (?, ?)"""
+        for _, value in self.domains.items():
+            # First the domain
+            cursor.execute(domain_insert, (self.db_id, value.domain_name, "UNKNOWN"))
+            value.db_id = int(cursor.fetchone()[0])
+
+            # Now the link table
+            for nameserver in value.nameservers:
+                nameserver_record = self.known_nameservers.get(nameserver)
+                cursor.execute(domain_nameservers, (value.db_id, nameserver_record['db_id']))
+        gtld_db.database_connection.commit()
+
     def process_loaded_zone(self):
         '''Processes parsed zone data'''
+        # Get our SOA
+        soa_record = list(self.parsed_zone.iterate_rdatas(dns.rdatatype.SOA))[0]
+        self.soa = int(soa_record[2].serial)
         records = list(self.parsed_zone.iterate_rdatas(dns.rdatatype.NS))
         for rr in records:
             full_domain_name = rr[0].to_text() + "." + self.origin
@@ -63,3 +100,5 @@ class ZoneData(object):
             self.known_nameservers[ns_text]['count'] = \
                 self.known_nameservers[ns_text]['count'] + 1
 
+        # Write it out to the database
+        self.to_db()
