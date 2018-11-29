@@ -22,6 +22,7 @@
 
 from gtld_data.config import gtld_lookup_config
 from gtld_data.domain_status import DomainStatus
+from gtld_data.nameserver_record import NameserverRecord
 
 import dns.resolver
 import dns.rdatatype
@@ -52,6 +53,36 @@ class DomainRecord(object):
         # And link nameserver records
         for nameserver in self.nameservers:
             cursor.execute(domain_nameservers, (self.db_id, nameserver.db_id))
+
+    @classmethod
+    def from_db(cls, cursor, db_id):
+        domain_select = """SELECT id, zone_file_id, domain_name, status FROM domains WHERE id = ?"""
+        domain_nameserver_ids = """SELECT nameserver_id FROM domain_nameservers WHERE domain_id = ?"""
+
+        # Read in the domain record
+        cursor.execute(domain_select, [int(db_id)])
+        row = cursor.fetchone()
+        domain_obj = cls(None)
+        domain_obj._db_row_to_self(row)
+
+        # Read in domain records
+        cursor.execute(domain_nameserver_ids, [domain_obj.db_id])
+        while True:
+            row = cursor.fetchone()
+            if row is None:
+                break
+            domain_obj.nameservers.add(
+                NameserverRecord.from_db(cursor, row[0])
+            )
+
+        return domain_obj
+
+    def _db_row_to_self(self, db_dict):
+        '''Converts db_dict to class data'''
+        self.db_id = db_dict[0]
+        self._zonefile_id = db_dict[1]
+        self.domain_name = db_dict[2]
+        self.status = db_dict[3]
 
     def lookup_nameservers(self):
         '''Looks up the nameservers for a given domain

@@ -21,9 +21,13 @@
 import unittest
 
 import dns.rdatatype
+
+from gtld_data import  gtld_db, gtld_lookup_config
 from gtld_data.domain_record import DomainRecord
 
-class TestDomainRecord(unittest.TestCase):
+from tests.database_unit_test import DatabaseUnitTest
+
+class TestDomainRecord(DatabaseUnitTest):
     def test_lookup_nameserver(self):
         '''Tests looking up nameservers'''
         domain_record = DomainRecord("casadevall.pro")
@@ -44,6 +48,26 @@ class TestDomainRecord(unittest.TestCase):
         domain_record = DomainRecord("casadevall.pro")
         reverse_ptrs = domain_record.reverse_lookup()
         self.assertGreater(len(reverse_ptrs), 0)
+
+    def test_read_write_database(self):
+        '''Test reading/writing records from the database'''
+        gtld_db.database_connection.begin()
+        cursor = gtld_db.database_connection.cursor()
+        zd_id = self.create_zone_data(cursor)
+
+        domain = DomainRecord('test.example.')
+        domain._zonefile_id = zd_id
+        domain.nameservers.add(
+            self.create_nameserver_record(cursor, zd_id, "ns1.example.")
+        )
+        domain.nameservers.add(
+            self.create_nameserver_record(cursor, zd_id, "ns2.example.")
+        )
+        domain.to_db(cursor)
+        
+        # Read back the object
+        domain2 = DomainRecord.from_db(cursor, domain.db_id)
+        self.assertEqual(domain.domain_name, domain2.domain_name)
 
     #def test_nxdomain_reverse_lookup(self):
     #    '''Test failure to reverse look up zone'''

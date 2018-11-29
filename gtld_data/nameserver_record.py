@@ -50,7 +50,7 @@ class NameserverRecord(object):
         cursor.execute(nameserver_select, [int(db_id)])
         row = cursor.fetchone()
         nameserver_obj = cls(None)
-        nameserver_obj._db_rows_to_self(row)
+        nameserver_obj._db_row_to_self(row)
         return nameserver_obj
 
     @classmethod
@@ -66,12 +66,12 @@ class NameserverRecord(object):
                 break
 
             nameserver_obj = cls(None)
-            nameserver_obj._db_rows_to_self(row)
+            nameserver_obj._db_row_to_self(row)
             ns_set.add(nameserver_obj)
         
         return ns_set
 
-    def _db_rows_to_self(self, db_dict):
+    def _db_row_to_self(self, db_dict):
         '''Converts db_dict to class data'''
         self.db_id = db_dict[0]
         self._zonefile_id = db_dict[1]

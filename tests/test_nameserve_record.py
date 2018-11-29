@@ -27,29 +27,9 @@ import tempfile
 import gtld_data
 from gtld_data import  gtld_db, gtld_lookup_config
 
-class TestNameserverRecord(unittest.TestCase):
-    def setUp(self):
-        self.db_filename = None
-        file_descriptor, self.db_filename = tempfile.mkstemp()
-        os.close(file_descriptor) # Don't need to write anything to it
-        gtld_lookup_config.database_path = self.db_filename
+from tests.database_unit_test import DatabaseUnitTest
 
-        # Just need a randomly generated filename
-        os.remove(self.db_filename)
-        gtld_db.create_database()
-
-    def tearDown(self):
-        gtld_db.database_connection.close()
-        os.remove(self.db_filename)
-
-    def create_zone_data(self, cursor):
-        zd = gtld_data.ZoneData()
-        zd.soa = "1"
-        zd.origin = "example"
-        zd.to_db(cursor)
-
-        return zd.db_id
-
+class TestNameserverRecord(DatabaseUnitTest):
     def test_read_write_database(self):
         '''Tests reading and writing nameserver records from the database'''
 
