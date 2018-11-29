@@ -42,7 +42,7 @@ class DomainRecord(object):
 
     def to_db(self, cursor):
         '''Stores domain record in the database'''
-        domain_insert = """INSERT INTO domains (zone_file, domain_name, status) VALUES (?, ?, ?) RETURNING id"""
+        domain_insert = """INSERT INTO domains (zone_file_id, domain_name, status) VALUES (?, ?, ?) RETURNING id"""
         domain_nameservers = """INSERT INTO domain_nameservers(domain_id, nameserver_id) VALUES (?, ?)"""
 
         # Save the domain record

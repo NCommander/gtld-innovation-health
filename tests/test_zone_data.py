@@ -19,14 +19,30 @@
 # DEALINGS IN THE SOFTWARE.
 
 import unittest
-
 import dns.rdatatype
-from gtld_data.domain_record import DomainRecord
+
+import os
+import tempfile
+
+import gtld_data
+from gtld_data import  gtld_db, gtld_lookup_config
 
 class TestZoneData(unittest.TestCase):
-    
-    def test_lookup_nameserver(self):
+    def setUp(self):
+        self.db_filename = None
+        file_descriptor, self.db_filename = tempfile.mkstemp()
+        os.close(file_descriptor) # Don't need to write anything to it
+        gtld_lookup_config.database_path = self.db_filename
+
+        # Just need a randomly generated filename
+        os.remove(self.db_filename)
+        gtld_db.create_database()
+
+    def tearDown(self):
+        gtld_db.database_connection.close()
+        os.remove(self.db_filename)
+
+    def test_reading_zone_file_to_db(self):
         '''Tests looking up nameservers'''
-        domain_record = DomainRecord("casadevall.pro")
-        domain_record.lookup_nameservers()
-        self.assertGreater(len(domain_record.nameservers), 0)
+        zone_data = gtld_data.ZoneData.load_from_file('tests/data/db.internic', origin='internic')
+        self.assertEqual(len(zone_data.domains), 2)

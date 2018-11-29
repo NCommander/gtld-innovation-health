@@ -44,9 +44,43 @@ class NameserverRecord(object):
     def increment_count(self):
         self.count = self.count+1
 
-    def to_db(self, cursor=None):
+    @classmethod
+    def from_db(cls, cursor, db_id):
+        nameserver_select = """SELECT id, zone_file_id, nameserver, domain_count FROM nameservers WHERE id=?"""
+        cursor.execute(nameserver_select, [int(db_id)])
+        row = cursor.fetchone()
+        nameserver_obj = cls(None)
+        nameserver_obj._db_rows_to_self(row)
+        return nameserver_obj
+
+    @classmethod
+    def read_all_from_db(cls, cursor, zonefile_id):
+        '''Reads all nameservers for a given zonefile id'''
+        nameserver_select = """SELECT id, zone_file_id, nameserver, domain_count FROM nameservers WHERE zone_file_id=?"""
+        cursor.execute(nameserver_select, [int(zonefile_id)])
+
+        ns_set = set()
+        while True:
+            row = cursor.fetchone()
+            if row is None:
+                break
+
+            nameserver_obj = cls(None)
+            nameserver_obj._db_rows_to_self(row)
+            ns_set.add(nameserver_obj)
+        
+        return ns_set
+
+    def _db_rows_to_self(self, db_dict):
+        '''Converts db_dict to class data'''
+        self.db_id = db_dict[0]
+        self._zonefile_id = db_dict[1]
+        self.nameserver = db_dict[2]
+        self.domain_count = db_dict[3]
+
+    def to_db(self, cursor):
         '''Stores nameserver in the database'''
         # Load the list of nameservers and append a database id to the dict
-        nameserver_insert = """INSERT INTO nameservers (zone_file, nameserver, domain_count) VALUES (?, ?, ?) RETURNING id"""
+        nameserver_insert = """INSERT INTO nameservers (zone_file_id, nameserver, domain_count) VALUES (?, ?, ?) RETURNING id"""
         cursor.execute(nameserver_insert, (self._zonefile_id, self.nameserver, self.count))
         self.db_id = int(cursor.fetchone()[0])

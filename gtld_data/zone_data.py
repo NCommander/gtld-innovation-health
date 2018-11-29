@@ -23,7 +23,7 @@ import dns.rdatatype
 
 from gtld_data.domain_status import DomainStatus
 from gtld_data.domain_record import DomainRecord
-from gtld_data.nameserver import NameserverRecord
+from gtld_data.nameserver_record import NameserverRecord
 
 from gtld_data.db import gtld_db
 
@@ -40,11 +40,15 @@ class ZoneData(object):
     @classmethod
     def load_from_file(cls, file_name, origin=None):
         zd = ZoneData()
-        zd.parsed_zone = dns.zone.from_file(file_name, origin=origin)
+        zd.parsed_zone = dns.zone.from_file(file_name, origin=origin, relativize=False)
         zd.origin = origin
         zd.process_loaded_zone()
         return zd
 
+    @classmethod
+    def load_from_db(cls, db_id):
+        zd = ZoneData()
+        
     def to_db(self, cursor):
         '''Stores zone data in the database'''
 

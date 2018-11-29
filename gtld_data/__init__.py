@@ -23,4 +23,5 @@ from gtld_data.zone_data import ZoneData
 from gtld_data.zone_processor import ZoneProcessor
 from gtld_data.config import Config, gtld_lookup_config
 from gtld_data.db import Database, gtld_db
+from gtld_data.nameserver_record import NameserverRecord
 
