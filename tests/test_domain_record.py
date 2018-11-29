@@ -63,11 +63,23 @@ class TestDomainRecord(DatabaseUnitTest):
         domain.nameservers.add(
             self.create_nameserver_record(cursor, zd_id, "ns2.example.")
         )
+
+        domain.reverse_lookup_ptrs.add(
+            self.create_ptr_record(cursor, zd_id, "10.10.10.1", "reverse.example")
+        )
+        domain.reverse_lookup_ptrs.add(
+            self.create_ptr_record(cursor, zd_id, "10.10.10.2", "reverse2.example")
+        )
+        domain.reverse_lookup_ptrs.add(
+            self.create_ptr_record(cursor, zd_id, "10.10.10.3", "reverse3.example")
+        )
         domain.to_db(cursor)
         
         # Read back the object
         domain2 = DomainRecord.from_db(cursor, domain.db_id)
         self.assertEqual(domain.domain_name, domain2.domain_name)
+        self.assertEqual(len(domain.nameservers), len(domain2.nameservers))
+        self.assertEqual(len(domain.reverse_lookup_ptrs), len(domain2.reverse_lookup_ptrs))
 
     #def test_nxdomain_reverse_lookup(self):
     #    '''Test failure to reverse look up zone'''

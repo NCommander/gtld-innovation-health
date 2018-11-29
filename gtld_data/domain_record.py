@@ -23,6 +23,7 @@
 from gtld_data.config import gtld_lookup_config
 from gtld_data.domain_status import DomainStatus
 from gtld_data.nameserver_record import NameserverRecord
+from gtld_data.ptr_record import PtrRecord
 
 import dns.resolver
 import dns.rdatatype
@@ -45,6 +46,7 @@ class DomainRecord(object):
         '''Stores domain record in the database'''
         domain_insert = """INSERT INTO domains (zone_file_id, domain_name, status) VALUES (?, ?, ?) RETURNING id"""
         domain_nameservers = """INSERT INTO domain_nameservers(domain_id, nameserver_id) VALUES (?, ?)"""
+        domain_ptrs = """INSERT INTO domain_ptr_records(domain_id, ptr_record_id) VALUES (?, ?)"""
 
         # Save the domain record
         cursor.execute(domain_insert, (self._zonefile_id, self.domain_name, self.status))
@@ -53,26 +55,36 @@ class DomainRecord(object):
         # And link nameserver records
         for nameserver in self.nameservers:
             cursor.execute(domain_nameservers, (self.db_id, nameserver.db_id))
+            
+        for ptr in self.reverse_lookup_ptrs:
+            cursor.execute(domain_ptrs, (self.db_id, ptr.db_id))
 
     @classmethod
     def from_db(cls, cursor, db_id):
         domain_select = """SELECT id, zone_file_id, domain_name, status FROM domains WHERE id = ?"""
         domain_nameserver_ids = """SELECT nameserver_id FROM domain_nameservers WHERE domain_id = ?"""
+        domain_ptr_ids = """SELECT ptr_record_id FROM domain_ptr_records WHERE domain_id = ?"""
 
         # Read in the domain record
         cursor.execute(domain_select, [int(db_id)])
-        row = cursor.fetchone()
+        row = cursor.fetchone() # Needed to clear cache
         domain_obj = cls(None)
         domain_obj._db_row_to_self(row)
 
         # Read in domain records
         cursor.execute(domain_nameserver_ids, [domain_obj.db_id])
-        while True:
-            row = cursor.fetchone()
-            if row is None:
-                break
+        rows = cursor.fetchall()
+        for row in rows:
             domain_obj.nameservers.add(
                 NameserverRecord.from_db(cursor, row[0])
+            )
+
+        # Read in domain records
+        cursor.execute(domain_ptr_ids, [domain_obj.db_id])
+        rows = cursor.fetchall()
+        for row in rows:
+            domain_obj.reverse_lookup_ptrs.add(
+                PtrRecord.from_db(cursor, row[0])
             )
 
         return domain_obj

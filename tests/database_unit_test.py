@@ -54,3 +54,9 @@ class DatabaseUnitTest(unittest.TestCase):
         nameserver_obj.domain_count = 1
         nameserver_obj.to_db(cursor)
         return nameserver_obj
+
+    def create_ptr_record(self, cursor, zd_id, ip_address, reverse_name):
+        ptr_obj = gtld_data.PtrRecord(ip_address, reverse_name)
+        ptr_obj._zonefile_id = zd_id
+        ptr_obj.to_db(cursor)
+        return ptr_obj

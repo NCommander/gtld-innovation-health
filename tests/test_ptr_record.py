@@ -46,7 +46,7 @@ class TestPtrRecord(DatabaseUnitTest):
         # Now read it back
         ptr_obj2 = gtld_data.PtrRecord.from_db(cursor, ptr_obj.db_id)
         self.assertEqual(ptr_obj.reverse_lookup_name, ptr_obj2.reverse_lookup_name)
-        self.assertEqual(ptr_obj.ip_address, ptr_obj2.ip_address))
+        self.assertEqual(ptr_obj.ip_address, ptr_obj2.ip_address)
         cursor.close()
 
     def test_read_all(self):
