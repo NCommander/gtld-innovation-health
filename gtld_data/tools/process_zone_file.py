@@ -1,3 +1,4 @@
+#!/usr/bin/env pyhton3
 # Copyright 2018 Michael Casadevall <michael@casadevall.pro>
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy

@@ -38,11 +38,11 @@ class ZoneData(object):
         self.known_nameservers = {}
 
     @classmethod
-    def load_from_file(cls, file_name, origin=None):
+    def load_from_file(cls, cursor, file_name, origin=None):
         zd = ZoneData()
         zd.parsed_zone = dns.zone.from_file(file_name, origin=origin, relativize=False)
         zd.origin = origin
-        zd.process_loaded_zone()
+        zd.process_loaded_zone(cursor)
         return zd
 
     @classmethod
@@ -57,8 +57,8 @@ class ZoneData(object):
         zone_file_insert = """INSERT INTO zone_files (origin, soa) VALUES (?, ?) RETURNING id"""
         cursor.execute(zone_file_insert, (self.origin, self.soa))
         self.db_id = int(cursor.fetchone()[0])
-
-    def process_loaded_zone(self):
+        
+    def process_loaded_zone(self, cursor):
         '''Processes parsed zone data'''
         # Get our SOA
         soa_record = list(self.parsed_zone.iterate_rdatas(dns.rdatatype.SOA))[0]
@@ -77,6 +77,7 @@ class ZoneData(object):
             nameserver_obj = self.known_nameservers.get(nameserver_txt, None)
             if nameserver_obj is None:
                 nameserver_obj = NameserverRecord(nameserver_txt)
+                nameserver_obj._zonefile_id = self.db_id
                 self.known_nameservers[nameserver_txt] = nameserver_obj
             self.known_nameservers[nameserver_txt].increment_count()
 
@@ -87,7 +88,7 @@ class ZoneData(object):
 
         # Now process the domains
         for rr in records:
-            full_domain_name = rr[0].to_text() + "." + self.origin
+            full_domain_name = rr[0].to_text()
             nameserver_txt = rr[2].to_text()
 
             # First document the domains
@@ -104,5 +105,3 @@ class ZoneData(object):
         for _, value in self.domains.items():
             value._zonefile_id = self.db_id
             value.to_db(cursor)
-
-        gtld_db.database_connection.commit()

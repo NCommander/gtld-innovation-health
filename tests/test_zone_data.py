@@ -44,5 +44,6 @@ class TestZoneData(unittest.TestCase):
 
     def test_reading_zone_file_to_db(self):
         '''Tests looking up nameservers'''
-        zone_data = gtld_data.ZoneData.load_from_file('tests/data/db.internic', origin='internic')
+        cursor = gtld_db.database_connection.cursor()
+        zone_data = gtld_data.ZoneData.load_from_file(cursor, 'tests/data/db.internic', origin='internic')
         self.assertEqual(len(zone_data.domains), 2)

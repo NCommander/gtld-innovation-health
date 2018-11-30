@@ -35,8 +35,8 @@ class NameserverRecord(object):
     def __eq__(self, other):
         return self.nameserver == other.nameserver
 
-    def __init__(self, name):
-        self._zonefile_id = None
+    def __init__(self, name, zonefile_id=None):
+        self._zonefile_id = zonefile_id
         self.db_id = None
         self.nameserver = name
         self.count = 0
@@ -78,9 +78,19 @@ class NameserverRecord(object):
         self.nameserver = db_dict[2]
         self.domain_count = db_dict[3]
 
-    def to_db(self, cursor):
+    def to_db(self, cursor, only_if_exists=False):
         '''Stores nameserver in the database'''
         # Load the list of nameservers and append a database id to the dict
+        nameserver_select = """SELECT id FROM nameservers WHERE nameserver = ?"""
         nameserver_insert = """INSERT INTO nameservers (zone_file_id, nameserver, domain_count) VALUES (?, ?, ?) RETURNING id"""
+
+        # Try doing a SELECT before inserting
+        if only_if_exists is True:
+            cursor.execute(nameserver_select, [self.nameserver])
+            row = cursor.fetchone()
+            if row is not None:
+                self.db_id = int(row[0])
+                return # We got our DB ID
+
         cursor.execute(nameserver_insert, (self._zonefile_id, self.nameserver, self.count))
         self.db_id = int(cursor.fetchone()[0])

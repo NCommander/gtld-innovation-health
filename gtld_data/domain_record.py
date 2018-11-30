@@ -34,7 +34,7 @@ class DomainRecord(object):
     def __hash__(self):
         return hash(self.domain_name)
 
-    def __init__(self, name):
+    def __init__(self, name, zonefile_id=None):
         self._zonefile_id = None
         self.db_id = None
         self.domain_name = name
@@ -47,10 +47,9 @@ class DomainRecord(object):
         '''Stores domain record in the database'''
         domain_insert = """INSERT INTO domains (zone_file_id, domain_name, status) VALUES (?, ?, ?) RETURNING id"""
         domain_nameservers = """INSERT INTO domain_nameservers(domain_id, nameserver_id) VALUES (?, ?)"""
-        domain_ptrs = """INSERT INTO domain_ptr_records(domain_id, ptr_record_id) VALUES (?, ?)"""
 
         # Save the domain record
-        cursor.execute(domain_insert, (self._zonefile_id, self.domain_name, self.status))
+        cursor.execute(domain_insert, (self._zonefile_id, self.domain_name, self.status.value))
         self.db_id = int(cursor.fetchone()[0])
 
         # And link nameserver records
@@ -58,7 +57,8 @@ class DomainRecord(object):
             cursor.execute(domain_nameservers, (self.db_id, nameserver.db_id))
             
         for ptr in self.reverse_lookup_ptrs:
-            cursor.execute(domain_ptrs, (self.db_id, ptr.db_id))
+            ptr._domain_id = self.db_id
+            ptr.to_db(cursor)
 
         for _, record_type in self.records.items():
             for record in record_type:
@@ -98,7 +98,7 @@ class DomainRecord(object):
         # Read in RData
         rdata_objs = DomainRData.read_all_from_db_for_domain(cursor, domain_obj.db_id)
         for rdata in rdata_objs:
-            domain_obj.add_record(rdata)
+            domain_obj.add_record(cursor, rdata)
 
         return domain_obj
 
@@ -107,7 +107,7 @@ class DomainRecord(object):
         self.db_id = db_dict[0]
         self._zonefile_id = db_dict[1]
         self.domain_name = db_dict[2]
-        self.status = db_dict[3]
+        self.status = DomainStatus(db_dict[3])
 
     def lookup_nameservers(self):
         '''Looks up the nameservers for a given domain
@@ -121,19 +121,22 @@ class DomainRecord(object):
 
         answers = resolver.query(self.domain_name, 'NS')
         for rdata in answers:
-            self.nameservers.add(rdata)
+            self.nameservers.add(NameserverRecord(self.domain_name, zonefile_id=self._zonefile_id))
     
-    def add_record(self, rdata_obj):
+    def add_record(self, cursor, rdata_obj):
         '''Adds a record to the internal data structure'''
 
-        rdata_obj._domain_id = self.db_id
+        if rdata_obj._domain_id is None and self.db_id is not None:
+            rdata_obj._domain_id = self.db_id
+            rdata_obj.to_db(cursor)
+
         rdata_dict = self.records.get(rdata_obj.rrtype, None)
         if rdata_dict is None:
             self.records[rdata_obj.rrtype] = set()
         
         self.records[rdata_obj.rrtype].add(rdata_obj)
 
-    def get_records(self, record_type, refresh=False):
+    def get_records(self, cursor, record_type, refresh=False):
         '''Gets a record type for this domain
         
         Returns True if the records were looked up, False if cached responses
@@ -158,11 +161,14 @@ class DomainRecord(object):
             return self.records[record_type]
 
         for rdata in answers:
-            self.records[record_type].add(rdata.to_text())
+            rdata_obj = DomainRData()
+            rdata_obj.rrtype = record_type
+            rdata_obj.rdata = rdata.to_text()
+            self.add_record(cursor, rdata_obj)
 
         return self.records[record_type]
 
-    def reverse_lookup(self, refresh=False):
+    def reverse_lookup(self, cursor, refresh=False):
         '''Does a reverse lookup of this domain; all A and AAAA records are pulled, and ptrs are populated'''
 
         # If we already have reverse records, ignore the request unless refresh is set
@@ -171,27 +177,37 @@ class DomainRecord(object):
                 return self.reverse_lookup_ptrs
 
         # A/AAAA records may not exist
-        a_records = self.get_records(dns.rdatatype.A)
-        aaaa_records = self.get_records(dns.rdatatype.AAAA)
+        a_records = self.get_records(cursor, "A")
+        aaaa_records = self.get_records(cursor, "AAAA")
 
         resolver = dns.resolver.Resolver(configure=False)
         resolver.nameservers = gtld_lookup_config.upstream_resolvers
 
         queries = set()
 
-        # Create DomainRecords for the reverse lookups
+        # Create tuples with the ip and reverse lookup zone for the reverse lookups
         for record in a_records:
-            queries.add(DomainRecord(dns.reversename.from_address(record).to_text()))
-
+            queries.add((record.rdata, (dns.reversename.from_address(record.rdata).to_text())))
         for record in aaaa_records:
-            queries.add(DomainRecord(dns.reversename.from_address(record).to_text()))
+            queries.add((record.rdata, (dns.reversename.from_address(record.rdata).to_text())))
 
         for query in queries:
             # We may get NXDOMAIN responses here
             try:
-                records = query.get_records("PTR")
+                # Create a DomainRecord for the reverse zone
+                reverse_record = DomainRecord(query[1], zonefile_id=self._zonefile_id)
+
+                records = reverse_record.get_records(cursor, "PTR")
                 for record in records:
-                    self.reverse_lookup_ptrs.add(record)
+                    ptr_obj = PtrRecord(query[0], record.rdata)
+        
+                    # If we're attached to a database, create the PtrRecord in the DB
+                    if self._zonefile_id is not None:
+                        ptr_obj._zonefile_id = self._zonefile_id
+                        ptr_obj._domain_id = self.db_id
+                        ptr_obj.to_db(cursor)
+                    self.reverse_lookup_ptrs.add(ptr_obj)
+
             except dns.resolver.NoAnswer:
                 continue
             except dns.resolver.NXDOMAIN:

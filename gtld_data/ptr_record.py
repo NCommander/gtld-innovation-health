@@ -37,6 +37,7 @@ class PtrRecord(object):
 
     def __init__(self, ip_address, name):
         self._zonefile_id = None
+        self._domain_id = None
         self.db_id = None
         self.ip_address = ip_address
         self.reverse_lookup_name = name
@@ -78,6 +79,24 @@ class PtrRecord(object):
     def to_db(self, cursor):
         '''Stores nameserver in the database'''
         # Load the list of nameservers and append a database id to the dict
-        nameserver_insert = """INSERT INTO ptr_records (zone_file_id, ip_address, reverse_lookup_name) VALUES (?, ?, ?) RETURNING id"""
-        cursor.execute(nameserver_insert, (self._zonefile_id, self.ip_address, self.reverse_lookup_name))
-        self.db_id = int(cursor.fetchone()[0])
+        ptr_insert = """INSERT INTO ptr_records (zone_file_id, ip_address, reverse_lookup_name) VALUES (?, ?, ?) RETURNING id"""
+        ptr_select = """SELECT id FROM ptr_records WHERE ip_address = ? AND reverse_lookup_name = ?"""
+
+        domain_ptr_select = """SELECT id FROM domain_ptr_records WHERE domain_id = ? AND ptr_record_id = ?"""
+        domain_ptrs_insert = """INSERT INTO domain_ptr_records(domain_id, ptr_record_id) VALUES (?, ?)"""
+
+        # Try doing a SELECT before inserting
+        cursor.execute(ptr_select, [self.ip_address, self.reverse_lookup_name])
+        row = cursor.fetchone()
+        if row is not None:
+            self.db_id = int(row[0])
+        else:
+            cursor.execute(ptr_insert, (self._zonefile_id, self.ip_address, self.reverse_lookup_name))
+            self.db_id = int(cursor.fetchone()[0])
+
+        # Now try to link it to the domain table if possible
+        if self._domain_id is not None:
+            cursor.execute(domain_ptr_select, [self._domain_id, self.db_id])
+            row = cursor.fetchone()
+            if row is None:
+                cursor.execute(domain_ptrs_insert, [self._domain_id, self.db_id])

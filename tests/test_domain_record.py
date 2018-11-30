@@ -31,23 +31,32 @@ from tests.database_unit_test import DatabaseUnitTest
 class TestDomainRecord(DatabaseUnitTest):
     def test_lookup_nameserver(self):
         '''Tests looking up nameservers'''
+        gtld_db.database_connection.begin()
+        cursor = gtld_db.database_connection.cursor()
+
         domain_record = DomainRecord("casadevall.pro")
         domain_record.lookup_nameservers()
         self.assertGreater(len(domain_record.nameservers), 0)
 
     def test_zone_lookup(self):
         '''Tests looking up a domain record'''
+        gtld_db.database_connection.begin()
+        cursor = gtld_db.database_connection.cursor()
+
         domain_record = DomainRecord("a.root-servers.net")
-        a_records = domain_record.get_records(dns.rdatatype.A)
+        a_records = domain_record.get_records(cursor, "A")
         self.assertGreater(len(a_records), 0)
 
-        aaaa_records = domain_record.get_records(dns.rdatatype.AAAA)
+        aaaa_records = domain_record.get_records(cursor, "AAAA")
         self.assertGreater(len(aaaa_records), 0)
 
     def test_valid_reverse_lookup(self):
         '''Tests looking up the reverse zone of a valid record'''
+        gtld_db.database_connection.begin()
+        cursor = gtld_db.database_connection.cursor()
+
         domain_record = DomainRecord("casadevall.pro")
-        reverse_ptrs = domain_record.reverse_lookup()
+        reverse_ptrs = domain_record.reverse_lookup(cursor)
         self.assertGreater(len(reverse_ptrs), 0)
 
     def test_read_write_database(self):
@@ -88,9 +97,9 @@ class TestDomainRecord(DatabaseUnitTest):
         rdata3.rrtype = "AAAA"
         rdata3.rdata = "ff01::1"
 
-        domain.add_record(rdata)
-        domain.add_record(rdata2)
-        domain.add_record(rdata3)
+        domain.add_record(cursor, rdata)
+        domain.add_record(cursor, rdata2)
+        domain.add_record(cursor, rdata3)
         domain.to_db(cursor)
         
         # Read back the object

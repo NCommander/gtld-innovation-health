@@ -24,34 +24,32 @@
 import argparse
 import operator
 
+from gtld_data import gtld_db
 import gtld_data
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('zonefile', help='Zonefile to load')
-    parser.add_argument('outfile', help="Output File (in CSV)")
     parser.add_argument('--origin', help="Origin of the zone file")
 
     args = parser.parse_args()
 
+    print("Creating database ...")
+    gtld_data.gtld_db.create_database()
+
+    gtld_db.database_connection.begin()
+    cursor = gtld_db.database_connection.cursor()
+
     print("Loading zone data, this may take a moment")
-    zd = gtld_data.ZoneData.load_from_file(args.zonefile, args.origin)
+    zone_data = gtld_data.ZoneData.load_from_file(cursor, args.zonefile, origin=args.origin)
 
-    print("Processing zone into useful data")
 
-    print("Unique domains: " + str(len(zd.domains)))
+    print("Unique domains: " + str(len(zone_data.domains)))
+    zone_processor = gtld_data.ZoneProcessor(zone_data)
+    zone_processor.get_reverse_zone_information(cursor, zone_data.domains)
+    zone_data.to_db(cursor)
+    gtld_db.database_connection.commit()
+    cursor.close()
 
-    # Create a temp dict for dumping the nameservers
-    nameservers_dict = {}
-    for nameserver in zd.known_nameservers:
-        nameservers_dict[nameserver.nameserver] = nameserver.count
-
-    sorted_d = sorted(nameservers_dict.items(), key=lambda kv: kv[1], reverse=True)
-    with open(args.outfile, 'w') as f:
-        for domain in sorted_d:
-            f.write(domain[0] + "," + str(domain[1]) + "\n")
-        f.write("\n")
-
-        
 if __name__ == "__main__":
     main()
