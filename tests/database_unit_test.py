@@ -48,6 +48,12 @@ class DatabaseUnitTest(unittest.TestCase):
 
         return zd.db_id
 
+    def create_domain_record(self, cursor, zd_id, name):
+        domain = gtld_data.DomainRecord(name)
+        domain._zonefile_id = zd_id
+        domain.to_db(cursor)
+        return domain.db_id
+
     def create_nameserver_record(self, cursor, zd_id, nameserver):
         nameserver_obj = gtld_data.NameserverRecord(nameserver)
         nameserver_obj._zonefile_id = zd_id

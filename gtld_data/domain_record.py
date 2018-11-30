@@ -24,6 +24,7 @@ from gtld_data.config import gtld_lookup_config
 from gtld_data.domain_status import DomainStatus
 from gtld_data.nameserver_record import NameserverRecord
 from gtld_data.ptr_record import PtrRecord
+from gtld_data.domain_rdata import DomainRData
 
 import dns.resolver
 import dns.rdatatype
@@ -59,6 +60,13 @@ class DomainRecord(object):
         for ptr in self.reverse_lookup_ptrs:
             cursor.execute(domain_ptrs, (self.db_id, ptr.db_id))
 
+        for _, record_type in self.records.items():
+            for record in record_type:
+                # It's possible the domain ID didn't get set on add record (this happens during testing)
+                # so manually set it here when we write to the DB
+                record._domain_id = self.db_id
+                record.to_db(cursor)
+
     @classmethod
     def from_db(cls, cursor, db_id):
         domain_select = """SELECT id, zone_file_id, domain_name, status FROM domains WHERE id = ?"""
@@ -87,6 +95,11 @@ class DomainRecord(object):
                 PtrRecord.from_db(cursor, row[0])
             )
 
+        # Read in RData
+        rdata_objs = DomainRData.read_all_from_db_for_domain(cursor, domain_obj.db_id)
+        for rdata in rdata_objs:
+            domain_obj.add_record(rdata)
+
         return domain_obj
 
     def _db_row_to_self(self, db_dict):
@@ -110,6 +123,16 @@ class DomainRecord(object):
         for rdata in answers:
             self.nameservers.add(rdata)
     
+    def add_record(self, rdata_obj):
+        '''Adds a record to the internal data structure'''
+
+        rdata_obj._domain_id = self.db_id
+        rdata_dict = self.records.get(rdata_obj.rrtype, None)
+        if rdata_dict is None:
+            self.records[rdata_obj.rrtype] = set()
+        
+        self.records[rdata_obj.rrtype].add(rdata_obj)
+
     def get_records(self, record_type, refresh=False):
         '''Gets a record type for this domain
         

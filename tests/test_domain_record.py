@@ -24,6 +24,7 @@ import dns.rdatatype
 
 from gtld_data import  gtld_db, gtld_lookup_config
 from gtld_data.domain_record import DomainRecord
+from gtld_data.domain_rdata import DomainRData
 
 from tests.database_unit_test import DatabaseUnitTest
 
@@ -73,6 +74,23 @@ class TestDomainRecord(DatabaseUnitTest):
         domain.reverse_lookup_ptrs.add(
             self.create_ptr_record(cursor, zd_id, "10.10.10.3", "reverse3.example")
         )
+
+        # Create an rdata record, and see if we can read/write it back
+        rdata = DomainRData()
+        rdata.rrtype = "A"
+        rdata.rdata = "192.168.1.1"
+
+        rdata2 = DomainRData()
+        rdata2.rrtype = "A"
+        rdata2.rdata = "192.168.1.2"
+
+        rdata3 = DomainRData()
+        rdata3.rrtype = "AAAA"
+        rdata3.rdata = "ff01::1"
+
+        domain.add_record(rdata)
+        domain.add_record(rdata2)
+        domain.add_record(rdata3)
         domain.to_db(cursor)
         
         # Read back the object
@@ -80,6 +98,8 @@ class TestDomainRecord(DatabaseUnitTest):
         self.assertEqual(domain.domain_name, domain2.domain_name)
         self.assertEqual(len(domain.nameservers), len(domain2.nameservers))
         self.assertEqual(len(domain.reverse_lookup_ptrs), len(domain2.reverse_lookup_ptrs))
+        self.assertEqual(len(domain.records['A']), 2)
+        self.assertEqual(len(domain.records['AAAA']), 1)
 
     #def test_nxdomain_reverse_lookup(self):
     #    '''Test failure to reverse look up zone'''

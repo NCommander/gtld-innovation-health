@@ -18,13 +18,36 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 # DEALINGS IN THE SOFTWARE.
 
-from gtld_data.domain_status import DomainStatus
-from gtld_data.zone_data import ZoneData
-from gtld_data.zone_processor import ZoneProcessor
-from gtld_data.config import Config, gtld_lookup_config
-from gtld_data.db import Database, gtld_db
-from gtld_data.nameserver_record import NameserverRecord
-from gtld_data.ptr_record import PtrRecord
-from gtld_data.domain_record import DomainRecord
-from gtld_data.domain_rdata import DomainRData
+import unittest
+import dns.rdatatype
 
+import os
+import tempfile
+
+import dns.rdatatype
+
+import gtld_data
+from gtld_data import  gtld_db, gtld_lookup_config
+
+from tests.database_unit_test import DatabaseUnitTest
+
+class TestDomainRData(DatabaseUnitTest):
+    def test_read_write_database(self):
+        '''Tests reading and writing nameserver records from the database'''
+
+        gtld_db.database_connection.begin()
+        cursor = gtld_db.database_connection.cursor()
+        zd_id = self.create_zone_data(cursor)
+        domain_id = self.create_domain_record(cursor, zd_id, "test.example.")
+
+        # Create an rdata record, and see if we can read/write it back
+        rdata = gtld_data.DomainRData()
+        rdata._domain_id = domain_id
+        rdata.rrtype = "A"
+        rdata.rdata = "192.168.1.1"
+        rdata.to_db(cursor)
+
+        # Now read it back
+        rdata2 = gtld_data.DomainRData.from_db(cursor, rdata.db_id)
+        self.assertEqual(rdata.rrtype, rdata2.rrtype)
+        self.assertEqual(rdata.rdata, rdata2.rdata)
