@@ -46,9 +46,20 @@ class ZoneData(object):
         return zd
 
     @classmethod
-    def load_from_db(cls, db_id):
-        zd = ZoneData()
-        
+    def load_from_db(cls, cursor, db_id):
+        zd = cls()
+        zone_file_select = """SELECT id, origin, soa FROM zone_files WHERE id = ?"""
+        cursor.execute(zone_file_select, [db_id])
+
+        row = cursor.fetchone()
+        zd.db_id = row[0]
+        zd.origin = row[1]
+        zd.soa = row[2]
+
+        zd.known_nameservers = NameserverRecord.read_all_from_db(cursor, zd.db_id)
+        zd.domains = DomainRecord.read_all_from_db(cursor, zd.db_id)
+        return zd
+
     def to_db(self, cursor):
         '''Stores zone data in the database'''
 

@@ -102,6 +102,22 @@ class DomainRecord(object):
 
         return domain_obj
 
+    @classmethod
+    def read_all_from_db(cls, cursor, zonefile_id):
+        '''Reads all nameservers for a given zonefile id'''
+        domain_all_select = """SELECT id FROM domains WHERE zone_file_id = ?"""
+
+        # This isn't a great way to do this, but I'm lazy
+        cursor.execute(domain_all_select, [int(zonefile_id)])
+
+        domain_set = set()
+        rows = cursor.fetchall()
+
+        for row in rows:
+            domain_obj = cls.from_db(cursor, int(row[0]))
+            domain_set.add(domain_obj)
+        return domain_set
+
     def _db_row_to_self(self, db_dict):
         '''Converts db_dict to class data'''
         self.db_id = db_dict[0]

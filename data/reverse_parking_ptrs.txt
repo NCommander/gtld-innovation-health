@@ -1,0 +1,10 @@
+parking(.*)\.reg\.ru\.$
+domainparking\.ru\.$
+parked\.hc\.ru.$
+r(.*)\.domainparking.ru\.$
+dns\.parked\.zone\.$
+nginx-parking-vip(.*)\.pwrs\.ru\.$
+dns-parked\.zone\.$
+dnsparking\.fv\.ee\.$
+srv-(.*)-msk\.park-web\.ru\.$
+parkingsrv(.*)\.dondominio\.com\.$

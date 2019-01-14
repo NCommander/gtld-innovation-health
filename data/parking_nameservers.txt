@@ -1,7 +1,7 @@
 # Domains found by grep search for parking
 \.domainparking\.ru\.$
-\.sedoparking\.com.\$
-parking(.*)\.nic\.ru\.
+\.sedoparking\.com\.$
+parking(.*)\.nic\.ru\.$
 \.domainparking\.ru\.$
 \.domainparking\.ru\.$
 \.parking\.ru\.$

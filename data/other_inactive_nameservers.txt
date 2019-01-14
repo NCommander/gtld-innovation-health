@@ -1,0 +1,2 @@
+# Domains that aren't active but don't match any other list
+statuspage(.*)\.nic\.ru\.$
